@@ -4,39 +4,28 @@ Integrantes:
 - Bastian Ampuero
 - Guliano Bardi
 
-## Compilacion y uso
+## Compilación y Ejecución
 
-Para compilar usamos los flags exigidos por la pauta:
+Compilación:
 g++ -Wall -Wextra -std=c++17 -lpthread planificador.cpp -o planificador
 
-Para correr el programa:
+Ejecución:
 ./planificador plan.txt K
 
-Donde K es la cantidad máxima de procesos que pueden correr en simultáneo.
+Donde K es el límite de procesos simultáneos.
 
-## Cómo funciona el código
+## Decisiones de Diseño
 
-- Manejo de tareas y dependencias: Leemos el archivo línea por línea y guardamos cada tarea en un vector. A cada una le guardamos sus datos, el tiempo de ejecución (si venía vacío le pusimos un número al azar entre 100 y 5000 ms) y la cantidad de dependencias que le faltan para poder partir (`deps_restantes`). Cada vez que una tarea termina bien, recorremos el arreglo y le restamos 1 a las tareas que la estaban esperando. Si la cuenta llega a 0, la tarea queda lista.
+- DAG y Dependencias: Leemos el archivo línea por línea guardando las tareas en un vector. Cada una tiene su tiempo (si venía vacío le pusimos rand entre 100 y 5000 ms) y la cantidad de dependencias que le faltan. Al terminar una tarea, se le descuenta a las que estaban esperando.
+- Concurrencia: No se lanzan más de K procesos a la vez. Usamos wait() bloqueante para esperar que termine alguno y liberar el cupo, evitando consumir CPU sin hacer nada (busy-waiting).
+- Pipes: Cada proceso hijo manda por su pipe el mensaje de texto avisando su insumo listo. El padre lo lee, lo muestra en consola y cierra los descriptores.
+- Aislamiento de fallos: Revisamos el retorno con WIFEXITED y WEXITSTATUS. Si una tarea termina con error, se marca cancelada toda la rama que dependía de ella y el resto del plan sigue normal.
+- Manejo de Ctrl+C (SIGINT): Se atrapa la señal, se le envía SIGKILL a los hijos que estén corriendo y se limpian los procesos antes de salir.
 
-- Límite de procesos (K) y CPU: Nos aseguramos de no pasar nunca el tope de K procesos ejecutándose a la vez. Cuando se llega a K o cuando no hay tareas disponibles para lanzar, usamos la llamada bloqueante:
-  wait(&estado_hijo);
-  Esto duerme al proceso padre a nivel de sistema operativo hasta que algún hijo cambie de estado, liberando el procesador y evitando busy-waiting.
+## Carga de Estrés
 
-- Comunicación con pipes: Cada hijo tiene su propio pipe creado antes del fork. El hijo duerme con usleep() y escribe el mensaje de texto al padre por el extremo de escritura:
-  write(t.fd[1], mensaje.c_str(), mensaje.size());
-  El padre lee el mensaje, lo muestra en consola y cierra los descriptores que ya no se usan para evitar fugas de archivos abiertos.
-
-- Manejo de fallos: Revisamos el retorno del proceso con las macros del sistema:
-  if (!WIFEXITED(estado_hijo) || WEXITSTATUS(estado_hijo) != 0) { ... }
-  Si una tarea se cae o sale con error, se marca como fallida y se cancelan todas las tareas que dependían de ella para que no se tranque el flujo. Las demás ramas independientes siguen corriendo normal.
-
-- Interrupción con Ctrl+C: Atrapamos la señal SIGINT con signal(SIGINT, manejador). Si se interrumpe la ejecución, el padre le manda SIGKILL a los procesos hijos activos, limpia los procesos zombies con wait(NULL) y cierra el programa limpiamente.
-
-## Prueba de estrés
-
-Hicimos el programa generador_estres.cpp para armar un archivo de prueba con 10.000 tareas encadenadas (carga_estres.txt) y probar que el sistema soporte volumen alto sin trabarse ni saturar los descriptores de archivo.
-
-Pasos para probarlo:
+Incluimos generador_estres.cpp para armar carga_estres.txt con 10000 actividades y probar el sistema con volumen alto.
+Para correr la prueba:
 g++ generador_estres.cpp -o generador_estres
 ./generador_estres
 ./planificador carga_estres.txt 5
