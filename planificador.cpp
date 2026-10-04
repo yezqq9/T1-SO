@@ -185,17 +185,17 @@ string linea;
 
 
         tarea t;
-        t.id = stoi(id);
-        t.nombre = nombre;
-        t.estado = "PENDIENTE";
+        t.id=stoi(id);
+        t.nombre=nombre;
+        t.estado="PENDIENTE";
 
 
         // si el tiempo viene vacio o solo con un espacio, asignamos aleatorio entre 100 y 5000
         if(tiempo=="" || tiempo==" "){
-        t.tiempo_ms = rand() % 4901 + 100;
+        t.tiempo_ms=rand() % 4901+100;
         }
         else{ 
-        t.tiempo_ms = stoi(tiempo);
+        t.tiempo_ms=stoi(tiempo);
         }
 
         
