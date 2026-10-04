@@ -1,0 +1,113 @@
+#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+
+using namespace std;
+
+// struct Actividad aquí arriba
+
+// Función para que el hijo mande mensaje al papà
+void mensaje_al_papasito(int fd_escritura, string nombre_tarea) {
+    string texto = "Insumo listo: " + nombre_tarea;
+    char buffer_de_mensajes[100];
+    
+    // Traspaso a la mala letra por letra para evitar bugs raros
+    for(size_t k = 0; k < texto.length(); k++) {
+        buffer_de_mensajes[k] = texto[k];
+    }
+    // Aseguramos el fin de cadena para que no imprima basura :v
+    buffer_de_mensajes[texto.length()] = '\0'; 
+    
+    // Escribimos los 100 bytes fijos
+    write(fd_escritura, buffer_de_mensajes, 100);
+}
+
+// Función para que el padre lea el pipe
+void leer_mensaje_hijito(int fd_lectura) {
+    char buffer_lectura[100];
+    // Leemos exactamente los mismos 100 bytes 
+    read(fd_lectura, buffer_lectura, 100);
+    
+    // Un cout piola para comprobar que el mensaje llegó bien (gemini cosas)
+    cout << "   [PIPE] " << buffer_lectura << endl;
+}
+
+void ejecutador_de_procesos(vector& DAG, int limite_K){
+    int procesos_ejecutandose = 0;
+    int tareas_terminadas = 0;
+    int tareas_totales = DAG.size();
+    
+    cout << "iniciando planificador" << endl;
+    
+    while(tareas_terminadas < tareas_totales){
+        bool hijo_activo = false;
+
+        if(procesos_ejecutandose < limite_K){
+            for(int i = 0; i < tareas_totales; i++){
+                if(DAG[i].estado == 0 && DAG[i].dependencias_restantes == 0){
+
+                    if(pipe(DAG[i].fd) == -1){
+                        cout << "error al crear pipe" << endl;
+                        exit(1);
+                    }
+
+                    pid_t pid = fork();
+
+                    if(pid < 0){
+                        cout << "error al crear el proceso" << endl;
+                        exit(1);
+                    }
+                    else if(pid == 0){
+                        // el hijo cierra la lectura de su pipe
+                        close(DAG[i].fd[0]);
+
+                        int segundos = DAG[i].tiempo_ms / 1000;
+
+                        if(segundos == 0){
+                            segundos = 1;
+                        }
+                        cout << "Hijo empezando a chambear en: " << DAG[i].nombre << endl;
+                        sleep(segundos);
+
+                        mensaje_al_papasito(DAG[i].fd[1], DAG[i].nombre);
+                        close(DAG[i].fd[1]);
+                        
+                        cout << "termine mi pega: " << DAG[i].nombre << endl;
+                        exit(0);
+                    }
+                    else{
+                        // el padre cierra la escritura de su pipe
+                        close(DAG[i].fd[1]);
+
+                        DAG[i].pid = pid;
+                        DAG[i].estado = 1;
+                        procesos_ejecutandose++;
+                        hijo_activo = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Para no hacer busy-waiting
+        if(procesos_ejecutandose == limite_K || (hijo_activo == false && procesos_ejecutandose > 0)){
+            int estado_hijo;
+            pid_t pid_muerto = wait(&estado_hijo);
+
+            for(int i = 0; i < tareas_totales; i++){
+                if(DAG[i].pid == pid_muerto){
+                    DAG[i].estado = 2;
+                    procesos_ejecutandose--;
+                    tareas_terminadas++;
+                
+                    leer_mensaje_hijito(DAG[i].fd[0]);
+                    close(DAG[i].fd[0]);
+                    break;
+                }
+            }
+        }
+    }
+}
