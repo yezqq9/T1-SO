@@ -2,8 +2,18 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <vector>
 
 using namespace std;
+
+struct tarea{
+    int id;
+    string nombre;
+    int tiempo_ms;              
+    vector<int> dependencias;  
+};
+
+
 int main(int argc, char* argv[]){
 if(argc<3){ //dado que solo nos piden "./planificador plan.txt K" solo tomamos estos argumentos, cualquier valor fuera de los solicitado no lo trabajamos. 
 cerr<<"Uso: "<<argv[0]<<" <archivo> <K>\n";
