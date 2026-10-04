@@ -17,8 +17,8 @@ return 1;
 }
 
 string linea;
-    while(getline(archivo, linea)){
-        stringstream flujo(linea);
+    while(getline(archivo, linea)){ //leemos el archivo linea por linea
+        stringstream flujo(linea); //convertimos la linea en flujo para separar sus campos
         string id, nombre, tiempo, dependencias;
 
         getline(flujo, id, ':');
