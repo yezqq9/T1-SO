@@ -52,27 +52,6 @@ void leer_mensaje_hijo(int fd_lectura){
 }
 
 
-//si una tarea falla tenemos que cancelar todas las que dependian de ella
-void cancelar_dependientes(vector<tarea>& DAG, int id_fallido, int& tareas_terminadas){
-    //recorremos todas las tareas buscando cuales tienen a la fallida en su lista
-    for(size_t i=0; i<DAG.size(); i++){
-        if(DAG[i].estado=="PENDIENTE"){
-            for(size_t d=0; d<DAG[i].dependencias.size(); d++){
-                //si la encontramos la marcamos cancelada para que nunca se ejecute
-                if(DAG[i].dependencias[d]==id_fallido){
-                    DAG[i].estado="CANCELADA";
-                    tareas_terminadas++; //la contamos como terminada para que no quede pegado el bucle
-                    cout<<"tarea "<<DAG[i].id<<": "<<DAG[i].nombre<<" cancelada por fallo en dependencia\n";
-                    //llamamos recursivo por si habian otras tareas que dependian de esta que acabamos de cancelar
-                    cancelar_dependientes(DAG, DAG[i].id, tareas_terminadas);
-                    break;
-                }
-            }
-        }
-    }
-}
-
-
 void ejecutador_de_procesos(vector<tarea>& DAG, int limite_K){
     int procesos_ejecutandose=0;
     int tareas_terminadas=0;
@@ -150,16 +129,16 @@ void ejecutador_de_procesos(vector<tarea>& DAG, int limite_K){
 
             for(int i=0; i<tareas_totales; i++){
                 if(DAG[i].pid==pid_muerto){
-                    procesos_ejecutandose--; //liberamos un cupo para que otra tarea pueda entrar
+                    procesos_ejecutandose--;
                     tareas_terminadas++;
 
-                    //revisamos con las macros si el hijo termino bien con exit 0 o si tiro error
+                    //revisamos si termino con error o bien
                     if(WIFEXITED(estado_hijo) && WEXITSTATUS(estado_hijo)==0){
                         DAG[i].estado="TERMINADA";
                         leer_mensaje_hijo(DAG[i].fd[0]);
-                        close(DAG[i].fd[0]); //cerramos la lectura del pipe
+                        close(DAG[i].fd[0]);
 
-                        //como termino bien le descontamos esta dependencia a las tareas que la estaban esperando
+                        //descontamos la dependencia lista a las tareas que la esperan
                         int id_terminado=DAG[i].id;
                         for(int j=0; j<tareas_totales; j++){
                             for(size_t d=0; d<DAG[j].dependencias.size(); d++){
@@ -170,12 +149,24 @@ void ejecutador_de_procesos(vector<tarea>& DAG, int limite_K){
                         }
                     }
                     else{
-                        //si retorno distinto de 0 la marcamos fallida y cerramos su pipe
+                        //si fallo cerramos pipe y cancelamos a las que dependen de ella
                         DAG[i].estado="FALLIDA";
                         close(DAG[i].fd[0]);
-                        cout<<"tarea "<<DAG[i].id<<": "<<DAG[i].nombre<<" fallo durante la ejecucion\n";
-                        //cancelamos en cascada toda la rama que dependia de ella
-                        cancelar_dependientes(DAG, DAG[i].id, tareas_terminadas);
+                        cout<<"tarea "<<DAG[i].id<<": "<<DAG[i].nombre<<" fallo\n";
+
+                        int id_fallo=DAG[i].id;
+                        for(int j=0; j<tareas_totales; j++){
+                            if(DAG[j].estado=="PENDIENTE"){
+                                for(size_t d=0; d<DAG[j].dependencias.size(); d++){
+                                    if(DAG[j].dependencias[d]==id_fallo){
+                                        DAG[j].estado="CANCELADA";
+                                        tareas_terminadas++;
+                                        cout<<"tarea "<<DAG[j].id<<": "<<DAG[j].nombre<<" cancelada\n";
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
                     break;
                 }
