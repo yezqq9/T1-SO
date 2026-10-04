@@ -35,13 +35,13 @@ srand(time(NULL)); //usamos la hora actual como semilla para que rand() no repit
 vector<tarea> lista_tareas; // vector donde guardaremos todas las tareas leidas
 string linea;
     while(getline(archivo, linea)){ //leemos el archivo linea por linea
-        stringstream flujo(linea); //convertimos la linea en flujo para separar sus campos
+        stringstream flujo_linea(linea); //convertimos la linea en flujo para separar sus campos
         string id, nombre, tiempo, dependencias;
 
-        getline(flujo, id, ':');
-        getline(flujo, nombre, ':'); //separamos por ":"
-        getline(flujo, tiempo, ':');
-        getline(flujo, dependencias);
+        getline(flujo_linea, id, ':');
+        getline(flujo_linea, nombre, ':'); //separamos por ":"
+        getline(flujo_linea, tiempo, ':');
+        getline(flujo_linea, dependencias);
 
 
         tarea t;
@@ -57,6 +57,16 @@ string linea;
         t.tiempo_ms = stoi(tiempo);
         }
 
+        
+        //separamos las dependencias por comas
+        stringstream flujo_deps(dependencias);
+        string dep;
+
+        while(getline(flujo_deps, dep, ',')){
+            if(dep!="" && dep!=" "){
+                t.dependencias.push_back(stoi(dep));
+            }
+        }
 
         
         lista_tareas.push_back(t);
@@ -64,8 +74,13 @@ string linea;
         cout<<"ID: "<<t.id<<"\n";
         cout<<"Nombre: "<<t.nombre<<"\n";
         cout<<"Tiempo: "<<t.tiempo_ms<<"\n";
-        cout<<"Dependencia: "<<dependencias<<"\n";
-        cout<<"\n";
+        for(size_t i = 0; i<t.dependencias.size(); i++){
+            cout<<t.dependencias[i]<<" ";
+        }   
+        cout<<"\n\n";
     }
+        
+(void)K;
+        
 return 0;
 }
