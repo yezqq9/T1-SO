@@ -1,4 +1,7 @@
-# Tarea 1: El Planificador Dieciochero
+# Planificador Dieciochero
+El Planificador Dieciochero
+Tarea 1 — Procesos, Tuberías y Señales
+Sistemas Operativos
 
 Integrantes:
 - Bastian Ampuero
