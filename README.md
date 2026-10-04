@@ -16,7 +16,7 @@ Donde:
 - plan.txt: archivo con las tareas, tiempos y sus dependencias.
 - K: cantidad maxima de procesos que dejamos correr al mismo tiempo.
 
-## Como pensamos la solucion (Diseno)
+## Como pensamos la solucion (Diseño)
 
 1. Lectura de datos y guardar las tareas
 Guardamos todo en un struct tarea adentro de un vector. Leemos con getline linea por linea y vamos cortando con ':' para sacar el id, nombre, tiempo y las dependencias. Si el tiempo viene vacio le tiramos un rand() entre 100 y 5000 ms. Las dependencias las separamos por coma y las metemos a un vector de enteros, y dejamos una variable deps_restantes con el total de dependencias para saber cuando la tarea queda lista para ejecutarse.
