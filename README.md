@@ -4,39 +4,33 @@ Integrantes:
 - Bastian Ampuero
 - Guliano Bardi
 
-## Compilacion y Ejecucion
+## Compilacion y uso
 
-Compilacion con banderas estrictas:
+Para compilar usamos los flags de la pauta:
 g++ -Wall -Wextra -std=c++17 -lpthread planificador.cpp -o planificador
 
-Ejecucion:
+Para correr el programa:
 ./planificador plan.txt K
 
-Donde plan.txt es el archivo con las tareas y K es el limite de procesos concurrentes.
+Donde K es la cantidad máxima de procesos que pueden correr al mismo tiempo.
 
-## Decisiones de Diseno y Funcionamiento
+## Cómo funciona el código
 
-1. Representacion del DAG y Dependencias
-Guardamos las tareas en un vector<tarea>. Cada actividad almacena su tiempo (si viene vacio o con espacio, usamos rand() % 4901 + 100 para darle entre 100 y 5000 ms) y un contador deps_restantes. Cada vez que un proceso hijo termina con exito, el padre busca en el vector y le descuenta 1 a todas las actividades que dependian de esa tarea terminada. Cuando el contador llega a 0, la tarea queda lista para lanzarse.
+- Manejo de tareas y dependencias: Leemos el archivo línea por línea y guardamos cada tarea en un vector. A cada una le guardamos sus datos, el tiempo de ejecución (si no venía definido le pusimos un número al azar entre 100 y 5000 ms) y la cantidad de dependencias que le faltan para poder partir. Cada vez que una tarea termina bien, recorremos el arreglo y le restamos 1 a las tareas que la estaban esperando. Si la cuenta llega a 0, la tarea queda lista.
 
-2. Control de Concurrencia y Sincronizacion (K)
-Para respetar el limite de K procesos activos y evitar consumo innecesario de procesador (busy-waiting), usamos la llamada bloqueante wait(&estado_hijo). Cuando se alcanza el tope de K o cuando no hay mas tareas listas para ejecutar, el padre se duerme en el wait. De esta forma el sistema operativo no gasta ciclos de CPU en un bucle vacio y solo despierta al padre cuando un hijo realmente cambia de estado.
+- Límite de procesos (K) y CPU: Nos aseguramos de no pasar nunca el tope de K procesos ejecutándose a la vez. Cuando se llega a K o cuando no hay tareas disponibles para lanzar, usamos wait() para pausar al padre. Esto hace que el proceso padre quede esperando que termine algún hijo sin gastar CPU en un ciclo vacío (evitando el busy-waiting).
 
-3. Comunicacion con Tuberias (Pipes)
-Cada proceso hijo tiene su propia tuberia creada con pipe(). 
-- El hijo cierra su extremo de lectura (fd[0]), simula el trabajo con usleep(), escribe por fd[1] el mensaje acotado "Insumo listo: [nombre]" y cierra el descriptor antes de salir con exit(0).
-- El padre cierra de inmediato el extremo de escritura (fd[1]) tras el fork(). Al recibir la muerte del hijo en el wait(), lee el mensaje por fd[0], lo imprime en pantalla y cierra ese descriptor para evitar fugas de recursos en el sistema.
+- Comunicación con pipes: Cada hijo tiene su propio pipe. Al terminar su simulación con usleep(), el hijo manda por la tubería el mensaje de texto avisando que su insumo está listo y cierra su extremo. El padre lee el mensaje, lo muestra en la consola y cierra los descriptores que ya no se usan para no acumular archivos abiertos.
 
-4. Aislamiento de Errores
-Analizamos la salida del hijo usando WIFEXITED(estado_hijo) y WEXITSTATUS(estado_hijo). Si el proceso termina con error (codigo distinto de 0), marcamos la tarea como FALLIDA y recorremos el vector para marcar como CANCELADA a todas las tareas que dependian de ella directa o indirectamente. De esta manera la rama rota se descarta de inmediato, se suman a las tareas finalizadas para no trabar el ciclo, y las demas ramas independientes del plan continuan ejecutandose normalmente.
+- Manejo de fallos: Revisamos la salida del proceso con WIFEXITED y WEXITSTATUS. Si una tarea se cae, se marca como fallida y se cancelan todas las tareas que dependían de ella para que no se tranque el flujo. El resto de las ramas independientes del plan siguen corriendo de forma normal.
 
-5. Inspeccion de la Seremi (Ctrl+C / SIGINT)
-Capturamos SIGINT con la funcion signal(). Al presionar Ctrl+C, una bandera atomica interrumpe el ciclo principal. El padre recorre las tareas activas (EN_PROCESO), les envia la senal SIGKILL para terminarlas al instante, cierra sus descriptores y hace una limpieza final con wait(NULL) para no dejar ningun proceso huerfano ni zombie en el sistema.
+- Interrupción con Ctrl+C: Atrapamos la señal SIGINT. Si se interrumpe la ejecución, el padre le manda SIGKILL a los hijos que todavía sigan corriendo, limpia los procesos con wait() para que no queden procesos zombi y cierra el programa de forma limpia.
 
-## Pruebas de Estres
-Incluimos el archivo auxiliar generador_estres.cpp para generar un plan masivo de 10.000 tareas encadenadas (carga_estres.txt) y comprobar la estabilidad del planificador ante alto volumen.
+## Prueba de estrés
 
-Para compilar, generar el archivo y ejecutar la prueba:
+Hicimos el programa generador_estres.cpp para armar un archivo de prueba con 10.000 tareas encadenadas (carga_estres.txt) y probar que el sistema soporte harto volumen sin quedarse pegado ni botar errores de pipes.
+
+Pasos para probarlo:
 g++ generador_estres.cpp -o generador_estres
 ./generador_estres
 ./planificador carga_estres.txt 5
