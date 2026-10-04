@@ -6,49 +6,48 @@ Integrantes:
 
 ## Descripción del Proyecto
 
-El proyecto consiste en un planificador de procesos en Linux para coordinar las actividades de una fonda dieciochera modeladas como un grafo dirigido acíclico (DAG). El sistema respeta dependencias entre tareas, limita la concurrencia a un máximo de K procesos simultáneos sin generar espera activa, comunica insumos mediante pipes, aísla fallos en ramas dependientes y responde a interrupciones de la Seremi (SIGINT).
+El programa es un planificador que organiza y ejecuta las actividades de una fonda dieciochera respetando el orden de sus dependencias como un grafo (DAG). Controla que no se superen nunca los K procesos corriendo a la vez sin gastar CPU en esperas vacías, coordina los mensajes de cada actividad mediante pipes, aísla los errores cancelando solo las tareas afectadas y maneja la interrupción por Ctrl+C (SIGINT) cerrando todo de forma limpia.
 
-Elegimos C++ (C++17) principalmente por dos razones:
-1. Permite acceso directo a las llamadas del sistema POSIX (fork, pipe, wait, signal) con el mismo rendimiento y control de bajo nivel que C.
-2. La biblioteca estándar (std::vector, std::string, std::stringstream) facilita el parseo del archivo y el manejo dinámico del grafo sin la complejidad ni los riesgos de memoria de los punteros manuales.
+Elegimos C++ principalmente para usar llamadas del sistema (fork, pipe, wait, signal) de forma directa y a la vez aprovechar la biblioteca estándar (vector, string, stringstream) para parsear el archivo y manejar las tareas sin enredarse con punteros manuales.
 
-## El formato de plan.txt
+## Formato de plan.txt
 
-Cada línea describe una actividad:
+Cada línea del archivo representa una actividad:
 
 ID : nombre : tiempo_ms : dep1, dep2, ...
 
-- Si tiempo_ms viene vacío, el programa le asigna un valor aleatorio entre 100 y 5000 ms.
-- Si no tiene dependencias, ese campo queda vacío.
+- Si tiempo_ms no viene definido, se asigna un valor aleatorio entre 100 y 5000 ms.
+- Si una actividad no depende de otra, el campo de dependencias queda en blanco.
 
 ## Compilación y Ejecución
 
-El Makefile corre g++ -Wall -Wextra -std=c++17 ... -lpthread, tal como pide el enunciado. make clean borra los ejecutables.
-
-Para compilar:
+Compilar con Makefile:
 make
 
-Para correrlo:
+O compilación manual:
+g++ -Wall -Wextra -std=c++17 -lpthread planificador.cpp -o planificador
+
+Limpiar ejecutables:
+make clean
+
+Ejecutar:
 ./planificador plan.txt K
 
-Donde plan.txt es el archivo con las actividades y K es cuántos procesos pueden estar vivos al mismo tiempo.
-
-Para limpiar:
-make clean
+Donde plan.txt es la lista de tareas y K el tope de procesos simultáneos.
 
 ## Decisiones de Diseño
 
-- DAG y Dependencias: Leemos el archivo línea por línea guardando las tareas en un vector. Cada una tiene su tiempo y la cantidad de dependencias que le faltan (deps_restantes). Al terminar una tarea, se le descuenta a las que estaban esperando.
-- Concurrencia: No se lanzan más de K procesos a la vez. Usamos wait() bloqueante para esperar que termine alguno y liberar el cupo, evitando consumir CPU sin hacer nada (busy-waiting).
-- Pipes: Cada proceso hijo manda por su pipe el mensaje de texto avisando su insumo listo. El padre lo lee, lo muestra en consola y cierra los descriptores para no acumular archivos abiertos.
-- Aislamiento de fallos: Revisamos el retorno con WIFEXITED y WEXITSTATUS. Si una tarea termina con error, se marca cancelada toda la rama que dependía de ella y el resto del plan sigue normal.
-- Manejo de Ctrl+C (SIGINT): Se atrapa la señal, se le envía SIGKILL a los hijos que estén corriendo y se limpian los procesos antes de salir para no dejar procesos zombi.
+- DAG y Dependencias: Guardamos las tareas en un vector. Cada una tiene su tiempo y un contador con las dependencias pendientes (deps_restantes). Cuando una tarea termina bien, le resta 1 a las que dependían de ella; al llegar a 0, la tarea queda habilitada para ejecutarse.
+- Concurrencia (K) y CPU: Nos aseguramos de no superar el límite K. Cuando se llega al tope o no hay tareas listas para lanzar, el padre se bloquea con wait() esperando a que termine algún hijo, liberando el procesador para evitar busy-waiting.
+- Pipes: Cada hijo recibe su propio pipe antes del fork. Al terminar su tiempo, escribe por el pipe avisando que su insumo está listo. El padre lee el mensaje, lo imprime por pantalla y cierra los descriptores para no dejar archivos abiertos.
+- Aislamiento de fallos: Se revisa el estado del hijo con WIFEXITED y WEXITSTATUS. Si una tarea falla, se marca como fallida y se cancelan automáticamente solo las tareas que dependían de ella, dejando que las ramas independientes sigan funcionando.
+- Manejo de Ctrl+C (SIGINT): Se captura la señal con signal(). Si se interrumpe, el padre envía SIGKILL a los hijos que sigan activos, limpia los procesos con wait() para no dejar zombis y termina la ejecución.
 
-## Carga de Estrés
+## Prueba de Estrés
 
-Incluimos generador_estres.cpp para armar carga_estres.txt con 10.000 actividades encadenadas y probar el sistema con volumen alto.
+Creamos generador_estres.cpp para generar un archivo carga_estres.txt con 10.000 tareas encadenadas y verificar que el planificador aguante alto volumen sin trabarse ni colapsar los pipes.
 
-Para correr la prueba:
+Para probarlo:
 make
 ./generador_estres
 ./planificador carga_estres.txt 5
