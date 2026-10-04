@@ -7,9 +7,18 @@
 #include <ctime>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 
 using namespace std;
+
+//bandera para atrapar ctrl c
+volatile sig_atomic_t cancelado=0;
+
+void cortar_programa(int sig){
+    (void)sig;
+    cancelado=1;
+}
 
 struct tarea{
     int id;
@@ -49,6 +58,20 @@ void ejecutador_de_procesos(vector<tarea>& DAG, int limite_K){
     int tareas_totales=DAG.size();
 
     while(tareas_terminadas<tareas_totales){
+
+        //si apretamos ctrl c matamos a los hijos activos
+        if(cancelado){
+            cout<<"\nprograma interrumpido, cerrando procesos...\n";
+            for(int i=0; i<tareas_totales; i++){
+                if(DAG[i].estado=="EN_PROCESO"){
+                    kill(DAG[i].pid, SIGKILL);
+                    close(DAG[i].fd[0]);
+                }
+            }
+            while(wait(NULL)>0);
+            exit(0);
+        }
+
         bool hijo_activo=false;
 
         //si hay cupo lanzamos tareas que no tengan dependencias pendientes
@@ -101,6 +124,9 @@ void ejecutador_de_procesos(vector<tarea>& DAG, int limite_K){
             int estado_hijo;
             pid_t pid_muerto=wait(&estado_hijo);
 
+            //si salto ctrl c volvemos al inicio del while
+            if(cancelado) continue;
+
             for(int i=0; i<tareas_totales; i++){
                 if(DAG[i].pid==pid_muerto){
                     DAG[i].estado="TERMINADA";
@@ -132,6 +158,10 @@ if(argc<3){ //dado que solo nos piden "./planificador plan.txt K" solo tomamos e
 cerr<<"Uso: "<<argv[0]<<" <archivo> <K>\n";
 return 1;
 }
+
+//capturamos ctrl c
+signal(SIGINT, cortar_programa);
+
 int K=stoi(argv[2]); //convertimos el argumento K de texto a entero para poder asignarlo
 ifstream archivo(argv[1]); //abrimos el archivo del argumento en la posicion 1 
 if(!archivo){
@@ -169,7 +199,7 @@ string linea;
         }
 
         
-        //separamos las dependencias por comas
+        //separamos las dependencias por comas al igual que en linea con ":"
         stringstream flujo_deps(dependencias);
         string dep;
 
