@@ -14,6 +14,7 @@ struct tarea{
     string nombre;
     int tiempo_ms;              
     vector<int> dependencias;  
+    string estado; // serían de forma pred: "PENDIENTE", "EN_PROCESO", "TERMINADA"
 };
 
 
