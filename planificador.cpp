@@ -5,6 +5,8 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <unistd.h>
+#include <sys/wait.h>
 
 
 using namespace std;
@@ -12,10 +14,117 @@ using namespace std;
 struct tarea{
     int id;
     string nombre;
-    int tiempo_ms;              
+    int tiempo_ms;               
     vector<int> dependencias;  
-    string estado; // serían de forma pred: "PENDIENTE", "EN_PROCESO", "TERMINADA"
+    int deps_restantes; //para saber cuantas dependencias le faltan para ejecutarse
+    string estado; //"PENDIENTE", "EN_PROCESO", "TERMINADA"
+    pid_t pid;
+    int fd[2]; //pipe para comunicar hijo con padre
 };
+
+
+//le manda el mensaje al papa por el pipe
+void mensaje_al_padre(int fd_escritura, string nombre_tarea){
+    string texto="Insumo listo: "+nombre_tarea;
+    char buffer[100];
+    for(size_t k=0; k<texto.length(); k++){
+        buffer[k]=texto[k];
+    }
+    buffer[texto.length()]='\0';
+    write(fd_escritura, buffer, 100);
+}
+
+
+//el papa lee lo que mando el hijo
+void leer_mensaje_hijo(int fd_lectura){
+    char buffer[100];
+    read(fd_lectura, buffer, 100);
+    cout<<"   [PIPE] "<<buffer<<"\n";
+}
+
+
+void ejecutador_de_procesos(vector<tarea>& DAG, int limite_K){
+    int procesos_ejecutandose=0;
+    int tareas_terminadas=0;
+    int tareas_totales=DAG.size();
+
+    while(tareas_terminadas<tareas_totales){
+        bool hijo_activo=false;
+
+        //si hay cupo lanzamos tareas que no tengan dependencias pendientes
+        if(procesos_ejecutandose<limite_K){
+            for(int i=0; i<tareas_totales; i++){
+                if(DAG[i].estado=="PENDIENTE" && DAG[i].deps_restantes==0){
+
+                    if(pipe(DAG[i].fd)==-1){
+                        cerr<<"error al crear pipe\n";
+                        exit(1);
+                    }
+
+                    pid_t pid=fork();
+
+                    if(pid<0){
+                        cerr<<"error al crear el proceso\n";
+                        exit(1);
+                    }
+                    else if(pid==0){
+                        //el hijo cierra la lectura
+                        close(DAG[i].fd[0]);
+
+                        cout<<"iniciando tarea "<<DAG[i].id<<": "<<DAG[i].nombre<<"\n";
+                        usleep(DAG[i].tiempo_ms*1000); //simulamos los ms del archivo
+
+                        mensaje_al_padre(DAG[i].fd[1], DAG[i].nombre);
+                        close(DAG[i].fd[1]);
+
+                        exit(0);
+                    }
+                    else{
+                        //el papa cierra la escritura
+                        close(DAG[i].fd[1]);
+
+                        DAG[i].pid=pid;
+                        DAG[i].estado="EN_PROCESO";
+                        procesos_ejecutandose++;
+                        hijo_activo=true;
+
+                        if(procesos_ejecutandose==limite_K){
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        //usamos wait para no meter busy-waiting
+        if(procesos_ejecutandose==limite_K || (hijo_activo==false && procesos_ejecutandose>0)){
+            int estado_hijo;
+            pid_t pid_muerto=wait(&estado_hijo);
+
+            for(int i=0; i<tareas_totales; i++){
+                if(DAG[i].pid==pid_muerto){
+                    DAG[i].estado="TERMINADA";
+                    procesos_ejecutandose--;
+                    tareas_terminadas++;
+
+                    leer_mensaje_hijo(DAG[i].fd[0]);
+                    close(DAG[i].fd[0]);
+
+                    //descontamos la dependencia lista a las tareas que la esperan
+                    int id_terminado=DAG[i].id;
+                    for(int j=0; j<tareas_totales; j++){
+                        for(size_t d=0; d<DAG[j].dependencias.size(); d++){
+                            if(DAG[j].dependencias[d]==id_terminado){
+                                DAG[j].deps_restantes--;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
 
 
 int main(int argc, char* argv[]){
@@ -61,15 +170,16 @@ string linea;
 
         
         //separamos las dependencias por comas
-        stringstream flujo_deps(dependencias);
-        string dep;
+        stringstream flujo_deps(dependencias);
+        string dep;
 
-        while(getline(flujo_deps, dep, ',')){
-            if(dep!="" && dep!=" "){
-                t.dependencias.push_back(stoi(dep));
-            }
-        }
+        while(getline(flujo_deps, dep, ',')){
+            if(dep!="" && dep!=" "){
+                t.dependencias.push_back(stoi(dep));
+            }
+        }
 
+        t.deps_restantes=t.dependencias.size();
         
         lista_tareas.push_back(t);
 
@@ -82,8 +192,8 @@ string linea;
         }   
         cout<<"\n\n";
     }
-        
-(void)K;
-        
+
+ejecutador_de_procesos(lista_tareas, K);
+
 return 0;
 }
