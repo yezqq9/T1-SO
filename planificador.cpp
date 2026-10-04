@@ -22,7 +22,7 @@ string linea;
         string id, nombre, tiempo, dependencias;
 
         getline(flujo, id, ':');
-        getline(flujo, nombre, ':');
+        getline(flujo, nombre, ':'); //separamos por ":"
         getline(flujo, tiempo, ':');
         getline(flujo, dependencias);
 
