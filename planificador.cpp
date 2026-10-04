@@ -74,6 +74,7 @@ string linea;
         cout<<"ID: "<<t.id<<"\n";
         cout<<"Nombre: "<<t.nombre<<"\n";
         cout<<"Tiempo: "<<t.tiempo_ms<<"\n";
+        cout<<"Dependencias: ";
         for(size_t i = 0; i<t.dependencias.size(); i++){
             cout<<t.dependencias[i]<<" ";
         }   
