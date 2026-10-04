@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <sstream>
 
 using namespace std;
 int main(int argc, char* argv[]){
@@ -14,9 +15,22 @@ if(!archivo){
 cerr<<"El archivo no se pudo abrir\n";
 return 1;
 }
+
 string linea;
-while(getline(archivo, linea)){
-cout<<"La linea obtenida es la siguiente: ["<<linea<<"]\n";
-}
+    while(getline(archivo, linea)){
+        stringstream flujo(linea);
+        string id, nombre, tiempo, dependencias;
+
+        getline(flujo, id, ':');
+        getline(flujo, nombre, ':');
+        getline(flujo, tiempo, ':');
+        getline(flujo, dependencias);
+
+        cout<<"ID: "<<id<<"\n";
+        cout<<"Nombre: "<<nombre<<"\n";
+        cout<<"Tiempo: "<<tiempo<<"\n";
+        cout<<"Dependencia: "<<dependencias<<"\n";
+        cout<<"\n";
+    }
 return 0;
 }
