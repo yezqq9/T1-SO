@@ -1,6 +1,6 @@
 # Planificador Dieciochero
 El Planificador Dieciochero
-Tarea 1 — Procesos, Tuberías y Señales
+Tarea 1: Procesos, Tuberías y Señales
 Sistemas Operativos
 
 Integrantes:
