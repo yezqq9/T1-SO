@@ -3,6 +3,9 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <cstdlib>
+#include <ctime>
+
 
 using namespace std;
 
@@ -26,6 +29,10 @@ cerr<<"El archivo no se pudo abrir\n";
 return 1;
 }
 
+
+srand(time(NULL)); //usamos la hora actual como semilla para que rand() no repita los mismos numeros al ejecutar
+    
+vector<tarea> lista_tareas; // vector donde guardaremos todas las tareas leidas
 string linea;
     while(getline(archivo, linea)){ //leemos el archivo linea por linea
         stringstream flujo(linea); //convertimos la linea en flujo para separar sus campos
@@ -36,9 +43,27 @@ string linea;
         getline(flujo, tiempo, ':');
         getline(flujo, dependencias);
 
-        cout<<"ID: "<<id<<"\n";
-        cout<<"Nombre: "<<nombre<<"\n";
-        cout<<"Tiempo: "<<tiempo<<"\n";
+
+        tarea t;
+        t.id = stoi(id);
+        t.nombre = nombre;
+
+
+        // si el tiempo viene vacio o solo con un espacio, asignamos aleatorio entre 100 y 5000
+        if(tiempo=="" || tiempo==" "){
+        t.tiempo_ms = rand() % 4901 + 100;
+        }
+        else{ 
+        t.tiempo_ms = stoi(tiempo);
+        }
+
+
+        
+        lista_tareas.push_back(t);
+
+        cout<<"ID: "<<t.id<<"\n";
+        cout<<"Nombre: "<<t.nombre<<"\n";
+        cout<<"Tiempo: "<<t.tiempo_ms<<"\n";
         cout<<"Dependencia: "<<dependencias<<"\n";
         cout<<"\n";
     }
