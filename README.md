@@ -19,7 +19,7 @@ ID : nombre : tiempo_ms : dep1, dep2, ...
 - Si tiempo_ms no viene definido, se asigna un valor aleatorio entre 100 y 5000 ms.
 - Si una actividad no depende de otra, el campo de dependencias queda en blanco.
 
-## Compilación y Ejecución
+## Compilación y Limpieza
 
 Compilar con Makefile:
 make
@@ -27,13 +27,33 @@ make
 O compilación manual:
 g++ -Wall -Wextra -std=c++17 -lpthread planificador.cpp -o planificador
 
-Limpiar ejecutables:
+Limpiar ejecutables y temporales:
 make clean
 
-Ejecutar:
+## Guía de Pruebas
+
+### 1. Ejecución Básica
+Para correr el planificador con cualquier archivo de tareas:
+
 ./planificador plan.txt K
 
-Donde plan.txt es la lista de tareas y K el tope de procesos simultáneos.
+Donde `plan.txt` es la lista de actividades y `K` es el número máximo de procesos simultáneos (ejemplo: `./planificador plan.txt 3`).
+
+### 2. Prueba de Interrupción (Ctrl+C / SIGINT)
+Para verificar que el sistema maneja la llegada de la Seremi y cierra los procesos ordenadamente:
+1. Iniciar el programa con un plan que tome algunos segundos:
+   ./planificador plan.txt 2
+2. Mientras se están ejecutando las tareas, presionar las teclas Ctrl + C en la terminal.
+3. El programa capturará la señal SIGINT, terminará los procesos hijos activos con SIGKILL, limpiará los procesos zombis y saldrá con un mensaje de cierre limpio.
+
+### 3. Prueba de Carga de Estrés (10.000 tareas)
+Para generar el archivo masivo y comprobar que el planificador soporte alto volumen sin agotar pipes ni recursos:
+1. Compilar todo:
+   make
+2. Generar el archivo de 10.000 actividades:
+   ./generador_estres
+3. Ejecutar el planificador con el archivo generado:
+   ./planificador carga_estres.txt 5
 
 ## Decisiones de Diseño
 
@@ -42,12 +62,3 @@ Donde plan.txt es la lista de tareas y K el tope de procesos simultáneos.
 - Pipes: Cada hijo recibe su propio pipe antes del fork. Al terminar su tiempo, escribe por el pipe avisando que su insumo está listo. El padre lee el mensaje, lo imprime por pantalla y cierra los descriptores para no dejar archivos abiertos.
 - Aislamiento de fallos: Se revisa el estado del hijo con WIFEXITED y WEXITSTATUS. Si una tarea falla, se marca como fallida y se cancelan automáticamente solo las tareas que dependían de ella, dejando que las ramas independientes sigan funcionando.
 - Manejo de Ctrl+C (SIGINT): Se captura la señal con signal(). Si se interrumpe, el padre envía SIGKILL a los hijos que sigan activos, limpia los procesos con wait() para no dejar zombis y termina la ejecución.
-
-## Prueba de Estrés
-
-Creamos generador_estres.cpp para generar un archivo carga_estres.txt con 10.000 tareas encadenadas y verificar que el planificador aguante alto volumen sin trabarse ni colapsar los pipes.
-
-Para probarlo:
-make
-./generador_estres
-./planificador carga_estres.txt 5
