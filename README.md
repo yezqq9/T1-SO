@@ -54,6 +54,7 @@ Para generar el archivo masivo y comprobar que el planificador soporte alto volu
    ./generador_estres
 3. Ejecutar el planificador con el archivo generado:
    ./planificador carga_estres.txt 5
+4. Aquí también se puede aplicar Ctrl + C en caso de que se quiera probar también.
 
 ## Decisiones de Diseño
 
