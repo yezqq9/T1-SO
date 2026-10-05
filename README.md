@@ -2,64 +2,55 @@
 
 Integrantes:
 - Bastian Ampuero
+
 - Guliano Bardi
 
-## Descripción del Proyecto
 
-El programa es un planificador que organiza y ejecuta las actividades de una fonda dieciochera respetando el orden de sus dependencias como un grafo (DAG). Controla que no se superen nunca los K procesos corriendo a la vez sin gastar CPU en esperas vacías, coordina los mensajes de cada actividad mediante pipes, aísla los errores cancelando solo las tareas afectadas y maneja la interrupción por Ctrl+C (SIGINT) cerrando todo de forma limpia.
+## Resumen del Proyecto
 
-Elegimos C++ principalmente para usar llamadas del sistema (fork, pipe, wait, signal) de forma directa y a la vez aprovechar la biblioteca estándar (vector, string, stringstream) para parsear el archivo y manejar las tareas sin enredarse con punteros manuales.
+Desarrollamos un planificador de tareas en C++ para simular la preparación de una fonda, modelando las actividades como un grafo dirigido (DAG). El programa se asegura de que no se superen los K procesos en paralelo, gestiona el traspaso de información con pipes, aísla los fallos cancelando solo las ramas afectadas y captura SIGINT (Ctrl+C) para cerrar los procesos de forma limpia y sin dejar procesos zombi.
 
-## Formato de plan.txt
+Optamos por C++ principalmente para utilizar directamente las syscalls de POSIX (fork, pipe, wait, signal) manteniendo un control fino de recursos, apoyándonos en estructuras estándar como std::vector y stringstream para procesar la entrada de datos de manera limpia.
 
-Cada línea del archivo representa una actividad:
+## Instrucciones de Compilación y Uso
 
-ID : nombre : tiempo_ms : dep1, dep2, ...
-
-- Si tiempo_ms no viene definido, se asigna un valor aleatorio entre 100 y 5000 ms.
-- Si una actividad no depende de otra, el campo de dependencias queda en blanco.
-
-## Compilación y Limpieza
-
-Compilar con Makefile:
+Para compilar ambos programas:
 make
 
-O compilación manual:
+Para compilar únicamente el planificador de forma manual:
 g++ -Wall -Wextra -std=c++17 -lpthread planificador.cpp -o planificador
 
-Limpiar ejecutables y temporales:
+Para limpiar ejecutables y archivos temporales:
 make clean
 
-## Guía de Pruebas
-
-### 1. Ejecución Básica
-Para correr el planificador con cualquier archivo de tareas:
-
+Para ejecutar el programa:
 ./planificador plan.txt K
 
-Donde `plan.txt` es la lista de actividades y `K` es el número máximo de procesos simultáneos (ejemplo: `./planificador plan.txt 3`).
+Donde plan.txt corresponde al archivo de entrada con las tareas y K representa la cota máxima de concurrencia.
 
-### 2. Prueba de Interrupción (Ctrl+C / SIGINT)
-Para verificar que el sistema maneja la llegada de la Seremi y cierra los procesos ordenadamente:
-1. Iniciar el programa con un plan que tome algunos segundos:
-   ./planificador plan.txt 2
-2. Mientras se están ejecutando las tareas, presionar las teclas Ctrl + C en la terminal.
-3. El programa capturará la señal SIGINT, terminará los procesos hijos activos con SIGKILL, limpiará los procesos zombis y saldrá con un mensaje de cierre limpio.
+## Verificación y Pruebas
 
-### 3. Prueba de Carga de Estrés (10.000 tareas)
-Para generar el archivo masivo y comprobar que el planificador soporte alto volumen sin agotar pipes ni recursos:
-1. Compilar todo:
-   make
-2. Generar el archivo de 10.000 actividades:
-   ./generador_estres
-3. Ejecutar el planificador con el archivo generado:
-   ./planificador carga_estres.txt 5
-4. Aquí también se puede aplicar Ctrl + C en caso de que se quiera probar también.
+- Ejecución estándar:
 
-## Decisiones de Diseño
+  Correr ./planificador plan.txt K con el archivo de actividades deseado.
 
-- DAG y Dependencias: Guardamos las tareas en un vector. Cada una tiene su tiempo y un contador con las dependencias pendientes (deps_restantes). Cuando una tarea termina bien, le resta 1 a las que dependían de ella; al llegar a 0, la tarea queda habilitada para ejecutarse.
-- Concurrencia (K) y CPU: Nos aseguramos de no superar el límite K. Cuando se llega al tope o no hay tareas listas para lanzar, el padre se bloquea con wait() esperando a que termine algún hijo, liberando el procesador para evitar busy-waiting.
-- Pipes: Cada hijo recibe su propio pipe antes del fork. Al terminar su tiempo, escribe por el pipe avisando que su insumo está listo. El padre lee el mensaje, lo imprime por pantalla y cierra los descriptores para no dejar archivos abiertos.
-- Aislamiento de fallos: Se revisa el estado del hijo con WIFEXITED y WEXITSTATUS. Si una tarea falla, se marca como fallida y se cancelan automáticamente solo las tareas que dependían de ella, dejando que las ramas independientes sigan funcionando.
-- Manejo de Ctrl+C (SIGINT): Se captura la señal con signal(). Si se interrumpe, el padre envía SIGKILL a los hijos que sigan activos, limpia los procesos con wait() para no dejar zombis y termina la ejecución.
+- Prueba de interrupción manual (Ctrl+C):
+
+  Lanzar una ejecución y enviar la señal SIGINT mediante Ctrl+C. El proceso padre captura la interrupción, envía SIGKILL a los hijos en ejecución y espera su término con wait() antes de salir.
+
+- Prueba de carga masiva:
+
+  Ejecutar ./generador_estres para crear el archivo carga_estres.txt (10.000 tareas) y luego correr ./planificador carga_estres.txt 5 para comprobar el comportamiento del sistema bajo alto volumen de procesos y descriptores.
+
+## Aspectos de Implementación
+
+- Representación del DAG: Las tareas se almacenan en un vector llevando la cuenta de dependencias pendientes. Cada vez que una tarea finaliza exitosamente, decrementa las dependencias de sus sucesoras; al llegar a cero, la tarea queda en cola para ejecutarse.
+
+- Concurrencia y uso de CPU: Se restringe el número de hijos simultáneos a K. Cuando se alcanza dicho límite o no existen tareas listas, el padre se bloquea invocando wait(), asegurando la liberación de CPU y evitando esperas activas.
+
+- Comunicación vía Pipes: Por cada tarea se crea un pipe antes del fork. El proceso hijo escribe el mensaje de término y el padre lo lee, lo imprime en pantalla y cierra los extremos para no agotar la tabla de descriptores.
+
+- Manejo de fallos: Se evalúa el código de retorno con macros WIFEXITED y WEXITSTATUS. Si una tarea concluye con error, se marca como fallida y se propagan cancelaciones únicamente sobre su descendencia directa e indirecta.
+
+- Control de señales: Se implementó un manejador para SIGINT que localiza los procesos hijos activos, les despacha SIGKILL y realiza la limpieza correspondiente para evitar estados zombi.
+
