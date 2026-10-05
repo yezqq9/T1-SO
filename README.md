@@ -52,5 +52,5 @@ Donde plan.txt corresponde al archivo de entrada con las tareas y K representa l
 
 - Manejo de fallos: Se evalúa el código de retorno con macros WIFEXITED y WEXITSTATUS. Si una tarea concluye con error, se marca como fallida y se propagan cancelaciones únicamente sobre su descendencia directa e indirecta.
 
-- Control de señales: Se implementó un manejador para SIGINT que localiza los procesos hijos activos, les despacha SIGKILL y realiza la limpieza correspondiente para evitar estados zombi.
+- Control de señales: Se implementó un manejador para SIGINT que localiza los procesos hijos activos, les despacha SIGKILL y realiza la limpieza correspondiente para evitar estados zombie.
 
