@@ -1,7 +1,7 @@
 # Tarea 1: El Planificador Dieciochero
 
 Integrantes:
-- Bastian Ampuero
+- Bastián Ampuero
 
 - Guliano Bardi
 
